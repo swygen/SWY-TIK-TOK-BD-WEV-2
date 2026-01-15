@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Swygen IT | Premium Downloader</title>
+    <title>Swygen IT | Ultimate Downloader</title>
     
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -39,7 +39,6 @@
 
         /* Banner */
         .banner { height: 160px; border-radius: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; color: white; margin-bottom: 30px; box-shadow: 0 10px 30px rgba(99, 102, 241, 0.4); position: relative; overflow: hidden; }
-        .banner::before { content:''; position: absolute; width: 150%; height: 100%; background: rgba(255,255,255,0.1); transform: rotate(45deg); top: -50%; }
         .banner h2 { z-index: 2; font-size: 24px; font-weight: 700; text-shadow: 0 2px 4px rgba(0,0,0,0.2); }
 
         /* Input Section */
@@ -87,7 +86,7 @@
         </header>
 
         <div class="banner">
-            <h2>Fast Downloader</h2>
+            <h2>Multi-Server Engine</h2>
         </div>
 
         <span class="label">Supported: FB • YT • TikTok • Insta</span>
@@ -108,20 +107,17 @@
             <div class="card">
                 <div class="success-icon"><i class="fa-solid fa-check"></i></div>
                 <h3>Success!</h3>
-                <p class="status-text">Your content is ready to download.</p>
-                
+                <p class="status-text">Video processed successfully.</p>
                 <a href="#" id="vidBtn" class="dl-btn btn-vid" target="_blank">
-                    <i class="fa-solid fa-video"></i> Download Video (HD)
+                    <i class="fa-solid fa-video"></i> Download Video
                 </a>
-                <a href="#" id="audBtn" class="dl-btn btn-aud" target="_blank">
-                    <i class="fa-solid fa-music"></i> Download Audio (MP3)
+                <a href="#" id="audBtn" class="dl-btn btn-aud" target="_blank" style="display:none">
+                    <i class="fa-solid fa-music"></i> Download Audio
                 </a>
             </div>
         </div>
 
-        <footer>
-            &copy; 2026 Swygen IT. All rights reserved.
-        </footer>
+        <footer>&copy; 2026 Swygen IT.</footer>
     </div>
 
     <div class="modal" id="modal">
@@ -133,7 +129,6 @@
     </div>
 
     <script>
-        // 1. Theme Logic
         function toggleTheme() {
             const html = document.documentElement;
             const icon = document.querySelector('.theme-btn i');
@@ -146,7 +141,6 @@
             }
         }
 
-        // 2. Paste Logic
         async function pasteLink() {
             try {
                 const text = await navigator.clipboard.readText();
@@ -156,7 +150,15 @@
             }
         }
 
-        // 3. Main Process (Using Cobalt API - Free & No Block)
+        // --- MULTI-SERVER LOGIC ---
+        // আমরা এই সার্ভারগুলো একটার পর একটা ট্রাই করব
+        const apiServers = [
+            "https://api.cobalt.tools/api/json",      // Main Server
+            "https://cobalt.1337.sb/api/json",        // Backup 1
+            "https://co.wuk.sh/api/json",             // Backup 2
+            "https://api.wkr.fr/api/json"             // Backup 3
+        ];
+
         async function processVideo() {
             const url = document.getElementById('url').value;
             const btnText = document.getElementById('btnText');
@@ -165,65 +167,76 @@
 
             if (url.length < 5) return showModal('Invalid Link', 'Please provide a valid URL.');
 
-            // UI State
             btnText.style.display = 'none';
             loader.style.display = 'block';
             resultArea.style.display = 'none';
 
-            // API Configuration
-            const apiData = {
-                url: url,
-                vCodec: "h264",
-                vQuality: "720",
-                aFormat: "mp3",
-                filenamePattern: "basic"
-            };
+            let success = false;
+            let lastError = "Unknown Error";
 
-            try {
-                // Calling Cobalt API (Free, No Auth, No IP Block)
-                const response = await fetch("https://api.cobalt.tools/api/json", {
-                    method: "POST",
-                    headers: {
-                        "Accept": "application/json",
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify(apiData)
-                });
-
-                const data = await response.json();
-
-                if (data.status === "error") {
-                    showModal('Failed', data.text || 'Could not fetch video.');
-                } else if (data.url) {
-                    // Success
-                    const vidBtn = document.getElementById('vidBtn');
-                    const audBtn = document.getElementById('audBtn');
-
-                    vidBtn.href = data.url;
+            // Loop through servers until one works
+            for (const server of apiServers) {
+                try {
+                    console.log(`Trying server: ${server}`);
                     
-                    // Audio Link (Cobalt doesn't always give separate audio in one go, 
-                    // so we point to same url or hide if needed. For now using same link as placeholder)
-                    // Better logic: Call API again for audio only if needed, or simple redirect.
-                    // For simplicity in this static version:
-                    audBtn.style.display = 'none'; // Hiding audio for now to keep it simple & working
-                    
-                    if(data.pickerType === 'various') {
-                         vidBtn.href = data.picker[0].url;
+                    const response = await fetch(server, {
+                        method: "POST",
+                        headers: {
+                            "Accept": "application/json",
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify({
+                            url: url,
+                            vCodec: "h264",
+                            vQuality: "720",
+                            aFormat: "mp3",
+                            isAudioOnly: false
+                        })
+                    });
+
+                    const data = await response.json();
+
+                    if (data.status === "error" || data.error) {
+                        lastError = data.text || data.error?.code || "Server Busy";
+                        continue; // Try next server
                     }
 
-                    resultArea.style.display = 'block';
-                }
+                    if (data.url || (data.picker && data.picker.length > 0)) {
+                        // Success!
+                        const vidBtn = document.getElementById('vidBtn');
+                        let finalUrl = data.url;
+                        
+                        if (!finalUrl && data.picker) {
+                            finalUrl = data.picker[0].url;
+                        }
 
-            } catch (error) {
-                showModal('Server Error', 'API is busy. Please try again later.');
-                console.error(error);
-            } finally {
-                btnText.style.display = 'block';
-                loader.style.display = 'none';
+                        vidBtn.href = finalUrl;
+                        
+                        // Audio check
+                        if(data.audio) {
+                             document.getElementById('audBtn').href = data.audio;
+                             document.getElementById('audBtn').style.display = 'flex';
+                        }
+
+                        resultArea.style.display = 'block';
+                        success = true;
+                        break; // Stop loop, we found a working server
+                    }
+
+                } catch (error) {
+                    console.error(error);
+                    lastError = "Connection Failed";
+                }
             }
+
+            if (!success) {
+                showModal('Download Failed', `All servers are busy. Error: ${lastError}. Please try again later.`);
+            }
+
+            btnText.style.display = 'block';
+            loader.style.display = 'none';
         }
 
-        // 4. Modal
         function showModal(title, msg) {
             document.getElementById('mTitle').innerText = title;
             document.getElementById('mMsg').innerText = msg;
